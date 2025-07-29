@@ -7,6 +7,12 @@ from videoCreator import make_video
 from folderclear import clear_all
 import time
 import sys
+import tkinter as tk
+from tkinter import filedialog
+
+# GUI SETUP
+root = tk.Tk()
+root.withdraw()
 
 
 # --- CONFIG ---
@@ -14,7 +20,33 @@ import sys
 VIDEO_DIR    = 'videos'
 OUTPUT_DIR   = 'output_plots'
 dpi          = 100
-JSON_PATH    = f'json_input/{input('Enter Name of File in Json_input folder you are reading: ')}'
+
+
+
+# --- Get JSON File ---
+json_path = filedialog.askopenfilename(
+    title="Select JSON File",
+    initialdir="json_input",
+    filetypes=[("JSON files", "*.json")]
+)
+if not json_path:
+    print("No JSON file selected. Exiting.")
+    sys.exit()
+JSON_PATH = json_path
+
+# --- Get Video File ---
+video_path = filedialog.askopenfilename(
+    title="Select Video File",
+    initialdir=VIDEO_DIR,
+    filetypes=[("Video files", "*.mp4 *.avi *.mov")]
+)
+if not video_path:
+    print("No video selected. Exiting.")
+    sys.exit()
+
+
+
+
 # 17‑point skeleton edges
 EDGES = [
     (0, 1), (0, 2), (1, 3), (2, 4),
@@ -26,9 +58,8 @@ EDGES = [
 # --- Setup Code ---
 os.makedirs(OUTPUT_DIR, exist_ok=True) #creates output if it doesnt exist
 #the stuff underneath is still setup just basically matches video resolution to json file
-video_ref = input('Video filename (in videos/): ')
 start_time = time.perf_counter()
-video_path = os.path.join(VIDEO_DIR, video_ref)
+
 cap = cv2.VideoCapture(video_path)
 w_res = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 h_res = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
