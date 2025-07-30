@@ -94,8 +94,8 @@ for ite, cur_file in enumerate(files):
                 plt.plot(x_coords, y_coords, color='red')
 
     plt.gca().invert_yaxis()
-    plt.xlim(800, 3700)
-    plt.ylim(2100, 300)
+    plt.xlim(0, 3700)
+    plt.ylim(2100, 0)
     plt.savefig(f"OpenPose_Code/newplots/plot_{ite}.png")
     plt.close(fig)
 
