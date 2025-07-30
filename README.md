@@ -1,5 +1,6 @@
 # Qc_MartialArts_NN
 Attempt at a neural network
+0.) Make sure there is an empty "newplots" folder under the OpenPose_Code folder before use, and an empty "output_plots" folder under AlphaPose_Code. If any are missing add them.
 1.) The test2 file contains working code for a different type of neural network; its purpose is to be studied and learned from, it is directly from pytorch website (we will be adapting this code later on)
 2.) Here are how the edges correspond to each number keypoint 
 
