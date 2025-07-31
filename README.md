@@ -61,9 +61,10 @@ Entry point. Launches the full process:
 
 ---
 
-## 🥚 Experimental File
+## 🥚 Experimental Files
 
 - `test2.py` (not currently used in the main pipeline) contains an example neural network directly from the PyTorch documentation. This is for learning purposes and will be adapted in the future.
+- `OpenPose_Code` (not currently in use) the process will be the same as alphapose code file just needs to be reformated 
 
 ---
 
