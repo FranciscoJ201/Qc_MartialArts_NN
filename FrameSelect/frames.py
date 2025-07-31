@@ -33,6 +33,8 @@ def detect_fps_and_total(video_path):
 
 # GUI
 def launch_gui():
+    result = {"start": None, "end": None}
+
     def browse_json():
         path = filedialog.askopenfilename(
             title="Select JSON File",
@@ -71,7 +73,7 @@ def launch_gui():
             if video_path:
                 fps, total_frames = detect_fps_and_total(video_path)
             else:
-                fps = 30  # fallback
+                fps = 30
         except:
             messagebox.showerror("FPS Error", "Could not read FPS from video.")
             return
@@ -87,6 +89,11 @@ def launch_gui():
             if total_frames is not None:
                 msg += f"Total Frames in Video: {total_frames}"
             messagebox.showinfo("Frame Info", msg)
+
+            result["start"] = s_frame
+            result["end"] = e_frame
+            root.quit()  # exit GUI loop
+
         except Exception as e:
             messagebox.showerror("Processing Error", str(e))
 
@@ -115,6 +122,8 @@ def launch_gui():
     tk.Button(root, text="Get Frame Range", command=compute_range).grid(row=4, column=1, pady=10)
 
     root.mainloop()
+    root.destroy()
 
-# Launch it
-launch_gui()
+    return result["start"], result["end"]
+
+
