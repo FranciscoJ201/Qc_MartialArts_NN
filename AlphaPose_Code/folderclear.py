@@ -16,6 +16,5 @@ def clear_directory(dir_path):
 def clear_all():
     directory = 'AlphaPose_Code/output_plots'  # replace with your directory path
     clear_directory(directory)
-    clear_directory('FrameSelect/selected_frames')
-    
+    clear_directory('AlphaPose_Code/selected_frames')
 clear_all()

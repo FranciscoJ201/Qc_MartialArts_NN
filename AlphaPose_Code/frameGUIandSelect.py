@@ -1,8 +1,13 @@
-import json
 import os
+import json
+import shutil
 import cv2
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
+
+# ----------------------------
+# Frame Range Helper Functions
+# ----------------------------
 
 def extract_frame_number(image_id):
     base = os.path.splitext(image_id)[0]
@@ -31,29 +36,14 @@ def detect_fps_and_total(video_path):
     cap.release()
     return fps, total_frames
 
-# GUI
-def launch_gui():
+# ----------------------------
+# GUI: Only Start and End Time Input
+# ----------------------------
+
+def launch_gui(json_path, video_path=None):
     result = {"start": None, "end": None}
 
-    def browse_json():
-        path = filedialog.askopenfilename(
-            title="Select JSON File",
-            filetypes=[("JSON Files", "*.json")]
-        )
-        json_path_var.set(path)
-
-    def browse_video():
-        path = filedialog.askopenfilename(
-            title="Select Video File (optional for FPS detection)",
-            filetypes=[("Video Files", "*.mp4 *.avi *.mov")]
-        )
-        video_path_var.set(path)
-
     def compute_range():
-        json_path = json_path_var.get()
-        video_path = video_path_var.get()
-        total_frames = None
-
         try:
             start_time = float(start_time_entry.get())
             end_time = float(end_time_entry.get())
@@ -61,19 +51,12 @@ def launch_gui():
             messagebox.showerror("Invalid Input", "Start and end times must be numeric.")
             return
 
-        if not json_path:
-            messagebox.showerror("Missing JSON", "Please select a JSON file.")
-            return
         if start_time >= end_time:
             messagebox.showerror("Invalid Range", "Start time must be less than end time.")
             return
 
-        # FPS: from video if provided, else fallback to 30
         try:
-            if video_path:
-                fps, total_frames = detect_fps_and_total(video_path)
-            else:
-                fps = 30
+            fps = detect_fps_and_total(video_path)[0] if video_path else 30
         except:
             messagebox.showerror("FPS Error", "Could not read FPS from video.")
             return
@@ -86,44 +69,60 @@ def launch_gui():
                 f"End Time: {end_time}s → Frame {e_frame}\n"
                 f"Frames found in JSON: {valid}\n"
             )
-            if total_frames is not None:
+            if video_path:
+                _, total_frames = detect_fps_and_total(video_path)
                 msg += f"Total Frames in Video: {total_frames}"
-            messagebox.showinfo("Frame Info", msg)
 
+            messagebox.showinfo("Frame Info", msg)
             result["start"] = s_frame
             result["end"] = e_frame
-            root.quit()  # exit GUI loop
+            root.quit()
+            root.destroy()
 
         except Exception as e:
             messagebox.showerror("Processing Error", str(e))
 
     root = tk.Tk()
-    root.title("JSON Frame Range (with Optional FPS Detection)")
+    root.title("Enter Time Range")
 
-    json_path_var = tk.StringVar()
-    video_path_var = tk.StringVar()
-
-    tk.Label(root, text="JSON File:").grid(row=0, column=0, sticky="e")
-    tk.Entry(root, textvariable=json_path_var, width=50).grid(row=0, column=1)
-    tk.Button(root, text="Browse", command=browse_json).grid(row=0, column=2)
-
-    tk.Label(root, text="Video File (Optional for FPS Calibration):").grid(row=1, column=0, sticky="e")
-    tk.Entry(root, textvariable=video_path_var, width=50).grid(row=1, column=1)
-    tk.Button(root, text="Browse", command=browse_video).grid(row=1, column=2)
-
-    tk.Label(root, text="Start Time (s):").grid(row=2, column=0, sticky="e")
+    tk.Label(root, text="Start Time (s):").grid(row=0, column=0, sticky="e")
     start_time_entry = tk.Entry(root)
-    start_time_entry.grid(row=2, column=1)
+    start_time_entry.grid(row=0, column=1)
 
-    tk.Label(root, text="End Time (s):").grid(row=3, column=0, sticky="e")
+    tk.Label(root, text="End Time (s):").grid(row=1, column=0, sticky="e")
     end_time_entry = tk.Entry(root)
-    end_time_entry.grid(row=3, column=1)
+    end_time_entry.grid(row=1, column=1)
 
-    tk.Button(root, text="Get Frame Range", command=compute_range).grid(row=4, column=1, pady=10)
+    tk.Button(root, text="Get Frame Range", command=compute_range).grid(row=2, column=1, pady=10)
 
     root.mainloop()
-    root.destroy()
 
     return result["start"], result["end"]
 
+# ----------------------------
+# Frame Copying Logic
+# ----------------------------
 
+# ✅ Insert your paths here manually
+
+def frame_selector(json_path,video_path):
+    # ✅ Run GUI to get frame range
+    start, end = launch_gui(json_path, video_path)
+
+    # ✅ Define directories
+    SOURCE_DIR = 'AlphaPose_Code/output_plots'
+    TARGET_DIR = 'AlphaPose_Code/selected_frames'
+    os.makedirs(TARGET_DIR, exist_ok=True)
+
+    # ✅ Copy selected frames
+    copied = 0
+    for frame in range(start, end + 1):
+        filename = f"plot_{frame}.png"
+        src_path = os.path.join(SOURCE_DIR, filename)
+        dst_path = os.path.join(TARGET_DIR, filename)
+
+        if os.path.exists(src_path):
+            shutil.copy2(src_path, dst_path)
+            copied += 1
+
+    print(f"Copied {copied} frames (plot_{start}.png to plot_{end}.png) to '{TARGET_DIR}'")

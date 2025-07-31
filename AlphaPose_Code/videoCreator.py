@@ -4,7 +4,7 @@ from os import listdir
 def make_video(name):
     # Directory where your plots are saved
     image_folder = 'AlphaPose_Code/output_plots'
-    output_video_path = f'AlphaPose_Code/Video_Outputs/{name}.mp4'
+    output_video_path = f'Video_Outputs/{name}.mp4'
 
 
     # Get all image filenames and sort them by frame number
