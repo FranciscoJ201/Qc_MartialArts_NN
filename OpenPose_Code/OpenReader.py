@@ -1,6 +1,8 @@
 import cv2
 import json
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # use non-GUI backend for faster rendering
 import matplotlib.pyplot as plt
 import re
 import os
@@ -77,27 +79,27 @@ for ite, cur_file in enumerate(files):
         people.append(np_keypoints.reshape(-1, 3))
     people = np.array(people)
 
-    fig = plt.figure(figsize=(width, height), dpi=dpi)
+    fig, ax = plt.subplots(figsize=(width, height), dpi=dpi)
 
     for person in people:
         for keypoint in person:
             if keypoint[2] != 0:
-                plt.plot(keypoint[0], keypoint[1], 'o')
+                ax.plot(keypoint[0], keypoint[1], 'o')
 
         for i, j in edges:
             node1 = person[i]
             node2 = person[j]
-
             if node1[2] != 0 and node2[2] != 0:
-                x_coords = [person[i, 0], person[j, 0]]
-                y_coords = [person[i, 1], person[j, 1]]
-                plt.plot(x_coords, y_coords, color='red')
+                ax.plot([node1[0], node2[0]], [node1[1], node2[1]], color='red')
 
-    plt.gca().invert_yaxis()
-    plt.xlim(0, 3700)
-    plt.ylim(2100, 0)
-    plt.savefig(f"OpenPose_Code/newplots/plot_{ite}.png")
+    ax.invert_yaxis()
+    ax.set_xlim(0, 3700)
+    ax.set_ylim(2100, 0)
+    ax.axis('off')  # optional: hides axis lines/ticks
+
+    fig.savefig(f"OpenPose_Code/newplots/plot_{ite}.png")
     plt.close(fig)
+
 
     elapsed = time.perf_counter() - start_time
     sys.stdout.write(f"\rFrame {ite+1}/{total} • Elapsed: {elapsed:.2f}s")

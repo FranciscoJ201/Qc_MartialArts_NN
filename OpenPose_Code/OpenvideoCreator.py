@@ -26,7 +26,7 @@ def make_video(name):
 
     # Define video writer (you can change fps and codec)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    fps = 240  # or adjust to match original video speed
+    fps = 30  # or adjust to match original video speed
     video_writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
     # Write each image to the video

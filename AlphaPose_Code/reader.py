@@ -1,6 +1,8 @@
 import os
 import json
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Step 1: Use non-GUI backend
 import matplotlib.pyplot as plt
 import cv2
 from videoCreator import make_video
@@ -14,14 +16,10 @@ from tkinter import filedialog
 root = tk.Tk()
 root.withdraw()
 
-
 # --- CONFIG ---
-
 VIDEO_DIR    = 'videos'
 OUTPUT_DIR   = 'AlphaPose_Code/output_plots'
 dpi          = 100
-
-
 
 # --- Get JSON File ---
 json_path = filedialog.askopenfilename(
@@ -44,9 +42,6 @@ if not video_path:
     print("No video selected. Exiting.")
     sys.exit()
 
-
-
-
 # 17‑point skeleton edges
 EDGES = [
     (0, 1), (0, 2), (1, 3), (2, 4),
@@ -56,8 +51,7 @@ EDGES = [
 ]
 
 # --- Setup Code ---
-os.makedirs(OUTPUT_DIR, exist_ok=True) #creates output if it doesnt exist
-#the stuff underneath is still setup just basically matches video resolution to json file
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 start_time = time.perf_counter()
 
 cap = cv2.VideoCapture(video_path)
@@ -70,59 +64,37 @@ fig_h = h_res / dpi
 
 clear_all()
 
-# --- Loading The Json File ---
+# --- Load JSON ---
 with open(JSON_PATH, 'r') as f:
-    data = json.load(f)   # data is a list of entries
+    data = json.load(f)
 
-# Group by image_id
 frames = {}
-#frames takes the form 
-# {
-#   '000001.jpg': [entryA, entryB, …],
-#   '000002.jpg': [entryC, …],
-#   … 
-# }
-# where each entryX is one person’s from that frame.
-
 for entry in data:
     fid = entry.get('image_id')
-    #skip any entries with no image id
-    if fid is None:
-        continue
-    frames.setdefault(fid, []).append(entry)
+    if fid is not None:
+        frames.setdefault(fid, []).append(entry)
 
-
-
-
-
-# Sort by numeric frame number (strip off ".jpg")
 def frame_num(fname):
     name, _ = os.path.splitext(os.path.basename(fname))
-    return int(name) #convers 000123 to 123
+    return int(name)
 
-#sorts the frame IDs for the next step
 sorted_fids = sorted(frames.keys(), key=frame_num)
-total = len(sorted_fids)  #for live timer
+total = len(sorted_fids)
 
-
-
-# --- Plotting for each frame ---
+# --- Plot Loop ---
 for idx, fid in enumerate(sorted_fids):
     people = []
     for person in frames[fid]:
         kp = np.array(person['keypoints'], dtype=float)
-        # reshape into N×3 (should be 17×3)
         if kp.size % 3 == 0:
-            # reshape into (N,3): N rows (keypoints), 3 cols (x, y, confidence)
             people.append(kp.reshape(-1, 3))
     if not people:
         continue
 
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)  # Step 2: use ax instead of plt global
     for person in people:
         visible = person[:, 2] > 0
         ax.plot(person[visible, 0], person[visible, 1], 'o')
-        # draw skeleton edges (EDGES list of (i,j) index pairs from all the way at the top):
 
         for i, j in EDGES:
             if person[i, 2] > 0 and person[j, 2] > 0:
@@ -135,25 +107,20 @@ for idx, fid in enumerate(sorted_fids):
     ax.invert_yaxis()
     ax.set_xlim(0, w_res)
     ax.set_ylim(h_res, 0)
-    ax.axis('on')
+    ax.axis('off')  # Optional: hide axes completely
 
     out_path = os.path.join(OUTPUT_DIR, f'plot_{idx}.png')
-    plt.savefig(out_path, bbox_inches='tight', pad_inches=0)
+    fig.savefig(out_path, bbox_inches='tight', pad_inches=0)
     plt.close(fig)
 
-    
     elapsed = time.perf_counter() - start_time
     sys.stdout.write(f"\rFrame {idx+1}/{total} • Elapsed: {elapsed:.2f}s")
     sys.stdout.flush()
 
-
-
-
-
+# --- Done ---
 end_time = time.perf_counter()
-print("Done!")
+print("\nDone!")
 print(f"Generated {len(sorted_fids)} plots in {end_time - start_time:.2f} seconds.")
-#name video here
+
 name = input('What do you want to name the video:')
 make_video(name)
-
