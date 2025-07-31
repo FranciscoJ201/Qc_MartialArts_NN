@@ -93,8 +93,8 @@ for ite, cur_file in enumerate(files):
                 ax.plot([node1[0], node2[0]], [node1[1], node2[1]], color='red')
 
     ax.invert_yaxis()
-    ax.set_xlim(0, 3700)
-    ax.set_ylim(2100, 0)
+    ax.set_xlim(0, 1920)
+    ax.set_ylim(1080, 0)
     ax.axis('off')  # optional: hides axis lines/ticks
 
     fig.savefig(f"OpenPose_Code/newplots/plot_{ite}.png")

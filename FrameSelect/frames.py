@@ -24,11 +24,12 @@ def frame_range_from_json(json_path, start_time, end_time, fps):
     valid_frames = sorted(f for f in frames if start_frame <= f < end_frame)
     return start_frame, end_frame - 1, valid_frames
 
-def detect_fps(video_path):
+def detect_fps_and_total(video_path):
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     cap.release()
-    return fps
+    return fps, total_frames
 
 # GUI
 def launch_gui():
@@ -49,6 +50,7 @@ def launch_gui():
     def compute_range():
         json_path = json_path_var.get()
         video_path = video_path_var.get()
+        total_frames = None
 
         try:
             start_time = float(start_time_entry.get())
@@ -67,9 +69,9 @@ def launch_gui():
         # FPS: from video if provided, else fallback to 30
         try:
             if video_path:
-                fps = detect_fps(video_path)
+                fps, total_frames = detect_fps_and_total(video_path)
             else:
-                fps = 30  # default fallback
+                fps = 30  # fallback
         except:
             messagebox.showerror("FPS Error", "Could not read FPS from video.")
             return
@@ -80,8 +82,10 @@ def launch_gui():
                 f"FPS used: {fps:.2f}\n"
                 f"Start Time: {start_time}s → Frame {s_frame}\n"
                 f"End Time: {end_time}s → Frame {e_frame}\n"
-                f"Frames found in JSON: {valid}"
+                f"Frames found in JSON: {valid}\n"
             )
+            if total_frames is not None:
+                msg += f"Total Frames in Video: {total_frames}"
             messagebox.showinfo("Frame Info", msg)
         except Exception as e:
             messagebox.showerror("Processing Error", str(e))
@@ -96,7 +100,7 @@ def launch_gui():
     tk.Entry(root, textvariable=json_path_var, width=50).grid(row=0, column=1)
     tk.Button(root, text="Browse", command=browse_json).grid(row=0, column=2)
 
-    tk.Label(root, text="Video File (Optional for Fps Calibration):").grid(row=1, column=0, sticky="e")
+    tk.Label(root, text="Video File (Optional for FPS Calibration):").grid(row=1, column=0, sticky="e")
     tk.Entry(root, textvariable=video_path_var, width=50).grid(row=1, column=1)
     tk.Button(root, text="Browse", command=browse_video).grid(row=1, column=2)
 
