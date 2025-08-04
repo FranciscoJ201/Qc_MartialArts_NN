@@ -118,7 +118,7 @@ def run_pose_plotter():
         print("\nDone!")
         print(f"Generated {len(sorted_fids)} plots in {end_time - start_time:.2f} seconds.")
 
-        make_video(video_name)
+        make_video(video_name,video_path)
 
         result["json"] = json_path
         result["video"] = video_path
