@@ -4,6 +4,6 @@ from frameGUIandSelect import frame_selector
 
 
 
-run_single_pose_plotter()
-# json,video,name = run_pose_plotter()
+# run_single_pose_plotter()
+json,video,name = run_pose_plotter()
 # frame_selector(json,video)

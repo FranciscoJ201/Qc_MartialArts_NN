@@ -10,7 +10,13 @@ from tkinter import filedialog, messagebox
 from videoCreator import make_video
 from folderclear import clear_all
 import time
-import sys
+
+def compute_keypoint_distance(p1, p2, keypoint_index):
+    x1, y1, c1 = p1[keypoint_index]
+    x2, y2, c2 = p2[keypoint_index]
+    if c1 > 0 and c2 > 0:
+        return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+    return None
 
 def run_pose_plotter():
     result = {"json": None, "video": None, "name": None}
@@ -58,7 +64,6 @@ def run_pose_plotter():
         fig_w = w_res / dpi
         fig_h = h_res / dpi
 
-        # Pose skeleton (COCO 17 keypoints)
         EDGES = [
             (0, 1), (0, 2), (1, 3), (2, 4),
             (0, 5), (0, 6), (5, 7), (7, 9),
@@ -74,32 +79,45 @@ def run_pose_plotter():
         frames = {}
         for entry in data:
             fid = entry.get('image_id')
-            if fid is not None:
+            if fid:
                 frames.setdefault(fid, []).append(entry)
 
         def frame_num(fname):
-            name, _ = os.path.splitext(os.path.basename(fname))
-            return int(name)
+            return int(os.path.splitext(os.path.basename(fname))[0])
 
         sorted_fids = sorted(frames.keys(), key=frame_num)
-        total = len(sorted_fids)
 
         for idx, fid in enumerate(sorted_fids):
             people = []
             for person in frames[fid]:
                 kp = np.array(person['keypoints'], dtype=float)
-                if kp.size % 3 == 0:
+                if kp.size == 51:
                     people.append(kp.reshape(-1, 3))
             if not people:
                 continue
 
             fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
+
             for person in people:
                 visible = person[:, 2] > 0
-                ax.plot(person[visible, 0], person[visible, 1], 'o')
+                ax.plot(
+                    person[visible, 0], person[visible, 1],
+                    'o', markersize=3, markeredgewidth=0, antialiased=False
+                )
                 for i, j in EDGES:
                     if person[i, 2] > 0 and person[j, 2] > 0:
-                        ax.plot([person[i, 0], person[j, 0]], [person[i, 1], person[j, 1]], color='red')
+                        ax.plot(
+                            [person[i, 0], person[j, 0]],
+                            [person[i, 1], person[j, 1]],
+                            color='red', linewidth=1, antialiased=False
+                        )
+
+            if len(people) >= 2:
+                dist = compute_keypoint_distance(people[0], people[1], 0)
+                if dist is not None:
+                    x1, y1 = people[0][0][:2]
+                    x2, y2 = people[1][0][:2]
+                    ax.plot([x1, x2], [y1, y2], color='black', linewidth=1.5, linestyle='--')
 
             ax.invert_yaxis()
             ax.set_xlim(0, w_res)
@@ -110,15 +128,10 @@ def run_pose_plotter():
             fig.savefig(out_path, bbox_inches='tight', pad_inches=0)
             plt.close(fig)
 
-            elapsed = time.perf_counter() - start_time
-            sys.stdout.write(f"\rFrame {idx+1}/{total} • Elapsed: {elapsed:.2f}s")
-            sys.stdout.flush()
-
         end_time = time.perf_counter()
-        print("\nDone!")
-        print(f"Generated {len(sorted_fids)} plots in {end_time - start_time:.2f} seconds.")
+        print(f"\nDone! Generated {len(sorted_fids)} plots in {end_time - start_time:.2f} seconds.")
 
-        make_video(video_name,video_path)
+        make_video(video_name, video_path)
 
         result["json"] = json_path
         result["video"] = video_path
@@ -127,7 +140,6 @@ def run_pose_plotter():
         root.quit()
         root.destroy()
 
-    # GUI Setup
     root = tk.Tk()
     root.title("Pose Plotter GUI")
 
