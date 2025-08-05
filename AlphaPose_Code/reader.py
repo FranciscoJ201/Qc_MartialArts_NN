@@ -1,9 +1,7 @@
+
 import os
 import json
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import cv2
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -17,6 +15,76 @@ def compute_keypoint_distance(p1, p2, keypoint_index):
     if c1 > 0 and c2 > 0:
         return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
     return None
+
+def frame_num(fname):
+    return int(os.path.splitext(os.path.basename(fname))[0])
+
+def draw_skeleton(frame, keypoints, color):
+    EDGES = [
+        (0, 1), (0, 2), (1, 3), (2, 4),
+        (0, 5), (0, 6), (5, 7), (7, 9),
+        (6, 8), (8, 10), (5, 11), (6, 12),
+        (11, 13), (13, 15), (12, 14), (14, 16)
+    ]
+    for i, j in EDGES:
+        if keypoints[i, 2] > 0 and keypoints[j, 2] > 0:
+            pt1 = tuple(keypoints[i, :2].astype(int))
+            pt2 = tuple(keypoints[j, :2].astype(int))
+            cv2.line(frame, pt1, pt2, color, 2)
+    for i in range(len(keypoints)):
+        if keypoints[i, 2] > 0:
+            pt = tuple(keypoints[i, :2].astype(int))
+            cv2.circle(frame, pt, 3, color, -1)
+
+def convert_json_to_opencv_images(json_path, video_path, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+
+    cap = cv2.VideoCapture(video_path)
+    w_res = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h_res = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cap.release()
+
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+
+    frames = {}
+    for entry in data:
+        fid = entry.get('image_id')
+        if fid:
+            frames.setdefault(fid, []).append(entry)
+
+    sorted_fids = sorted(frames.keys(), key=frame_num)
+
+    start_time = time.perf_counter()
+
+    for idx, fid in enumerate(sorted_fids):
+        people = []
+        for person in frames[fid]:
+            kp = np.array(person['keypoints'], dtype=float)
+            if kp.size == 51:
+                people.append(kp.reshape(-1, 3))
+        if not people:
+            continue
+
+        frame = np.ones((h_res, w_res, 3), dtype=np.uint8) * 255
+        colors = [(0, 0, 255), (255, 0, 0), (0, 255, 0), (255, 0, 255)]
+        for i, person in enumerate(people):
+            draw_skeleton(frame, person, colors[i % len(colors)])
+
+        if len(people) >= 2:
+            dist = compute_keypoint_distance(people[0], people[1], 0)
+            if dist is not None:
+                x1, y1 = people[0][0][:2].astype(int)
+                x2, y2 = people[1][0][:2].astype(int)
+                cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 0), 2, lineType=cv2.LINE_AA)
+
+        out_path = os.path.join(output_dir, f'plot_{idx}.png')
+        cv2.imwrite(out_path, frame)
+
+        elapsed = time.perf_counter() - start_time
+        print(f"Frame {idx+1}/{len(sorted_fids)} • Elapsed: {elapsed:.2f}s")
+
+    return output_dir
 
 def run_pose_plotter():
     result = {"json": None, "video": None, "name": None}
@@ -51,86 +119,10 @@ def run_pose_plotter():
             return
 
         OUTPUT_DIR = 'AlphaPose_Code/output_plots'
-        dpi = 100
-
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         clear_all()
 
-        cap = cv2.VideoCapture(video_path)
-        w_res = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        h_res = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        cap.release()
-
-        fig_w = w_res / dpi
-        fig_h = h_res / dpi
-
-        EDGES = [
-            (0, 1), (0, 2), (1, 3), (2, 4),
-            (0, 5), (0, 6), (5, 7), (7, 9),
-            (6, 8), (8, 10), (5, 11), (6, 12),
-            (11, 13), (13, 15), (12, 14), (14, 16)
-        ]
-
-        start_time = time.perf_counter()
-
-        with open(json_path, 'r') as f:
-            data = json.load(f)
-
-        frames = {}
-        for entry in data:
-            fid = entry.get('image_id')
-            if fid:
-                frames.setdefault(fid, []).append(entry)
-
-        def frame_num(fname):
-            return int(os.path.splitext(os.path.basename(fname))[0])
-
-        sorted_fids = sorted(frames.keys(), key=frame_num)
-
-        for idx, fid in enumerate(sorted_fids):
-            people = []
-            for person in frames[fid]:
-                kp = np.array(person['keypoints'], dtype=float)
-                if kp.size == 51:
-                    people.append(kp.reshape(-1, 3))
-            if not people:
-                continue
-
-            fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-
-            for person in people:
-                visible = person[:, 2] > 0
-                ax.plot(
-                    person[visible, 0], person[visible, 1],
-                    'o', markersize=3, markeredgewidth=0, antialiased=False
-                )
-                for i, j in EDGES:
-                    if person[i, 2] > 0 and person[j, 2] > 0:
-                        ax.plot(
-                            [person[i, 0], person[j, 0]],
-                            [person[i, 1], person[j, 1]],
-                            color='red', linewidth=1, antialiased=False
-                        )
-
-            if len(people) >= 2:
-                dist = compute_keypoint_distance(people[0], people[1], 0)
-                if dist is not None:
-                    x1, y1 = people[0][0][:2]
-                    x2, y2 = people[1][0][:2]
-                    ax.plot([x1, x2], [y1, y2], color='black', linewidth=1.5, linestyle='--')
-
-            ax.invert_yaxis()
-            ax.set_xlim(0, w_res)
-            ax.set_ylim(h_res, 0)
-            ax.axis('off')
-
-            out_path = os.path.join(OUTPUT_DIR, f'plot_{idx}.png')
-            fig.savefig(out_path, bbox_inches='tight', pad_inches=0)
-            plt.close(fig)
-
-        end_time = time.perf_counter()
-        print(f"\nDone! Generated {len(sorted_fids)} plots in {end_time - start_time:.2f} seconds.")
-
+        convert_json_to_opencv_images(json_path, video_path, OUTPUT_DIR)
         make_video(video_name, video_path)
 
         result["json"] = json_path
@@ -159,7 +151,6 @@ def run_pose_plotter():
     video_name_entry.grid(row=2, column=1)
 
     tk.Button(root, text="Run Pose Plotter", command=run_processing).grid(row=3, column=1, pady=10)
-
     root.mainloop()
 
     return result["json"], result["video"], result["name"]
