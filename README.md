@@ -102,3 +102,21 @@ These are the connections between keypoints that the plotter uses:
 5. **Input start and end times (in seconds) to select a portion**
 6. **Review final output in **``
 
+---
+## 🧪 New Experimental Additions
+
+### `repair.py` – *Fixes ID Reuse Issues*
+
+- AlphaPose may reuse `"idx"` values when a person leaves and re-enters the frame.
+- This script scans all frames in order and remaps reused `"idx"` values to consistent ones by assigning new IDs when a person disappears and later reappears.
+- **Output:** a new JSON file called `result_recycled.json` with updated IDs.
+- 🔧 **Status:** Early-stage: It handles recycling based on visibility but may misassign IDs if people overlap or occlude each other rapidly.
+
+### `singleReader.py` – *Focus on One Person Only*
+
+- Modified version of `reader.py` that only plots the skeleton of a specific `"idx"` (person).
+- GUI shows available `"idx"` values (if tracking was enabled), and user can choose which person to visualize.
+- Useful for isolating a single subject across long videos with many detected individuals.
+- **Depends on:** consistent tracking from AlphaPose.
+- 🔧 **Status:** In progress — if AlphaPose doesn't track reliably or recycles IDs, output may be inconsistent. Pair with `repair.py` for best (but still inaccurate) results.
+
