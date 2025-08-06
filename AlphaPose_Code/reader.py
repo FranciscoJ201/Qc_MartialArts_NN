@@ -1,4 +1,3 @@
-
 import os
 import json
 import numpy as np
@@ -9,12 +8,14 @@ from videoCreator import make_video
 from folderclear import clear_all
 import time
 
-def compute_keypoint_distance(p1, p2, keypoint_index):
-    x1, y1, c1 = p1[keypoint_index]
-    x2, y2, c2 = p2[keypoint_index]
-    if c1 > 0 and c2 > 0:
-        return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
-    return None
+def get_center(kp):
+    try:
+        hips = kp[[11, 12]]
+        if hips[:, 2].min() > 0:
+            return np.mean(hips[:, :2], axis=0)
+    except:
+        pass
+    return kp[0, :2] if kp[0, 2] > 0 else np.array([0, 0])
 
 def frame_num(fname):
     return int(os.path.splitext(os.path.basename(fname))[0])
@@ -55,28 +56,51 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
 
     sorted_fids = sorted(frames.keys(), key=frame_num)
 
+    ID_A = 0
+    ID_B = 1
+
     start_time = time.perf_counter()
 
     for idx, fid in enumerate(sorted_fids):
-        people = []
-        for person in frames[fid]:
-            kp = np.array(person['keypoints'], dtype=float)
-            if kp.size == 51:
-                people.append(kp.reshape(-1, 3))
-        if not people:
-            continue
-
+        id_to_pose = {}
         frame = np.ones((h_res, w_res, 3), dtype=np.uint8) * 255
-        colors = [(0, 0, 255), (255, 0, 0), (0, 255, 0), (255, 0, 255)]
-        for i, person in enumerate(people):
-            draw_skeleton(frame, person, colors[i % len(colors)])
 
-        if len(people) >= 2:
-            dist = compute_keypoint_distance(people[0], people[1], 0)
-            if dist is not None:
-                x1, y1 = people[0][0][:2].astype(int)
-                x2, y2 = people[1][0][:2].astype(int)
-                cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 0), 2, lineType=cv2.LINE_AA)
+        # Draw all people in gray
+        for person in frames[fid]:
+            idx_val = person.get("idx")
+            kp = np.array(person["keypoints"], dtype=float)
+            if kp.size == 51:
+                pose = kp.reshape(-1, 3)
+                draw_skeleton(frame, pose, (180, 180, 180))  # light gray
+                # Label ID above the nose if visible
+                if pose[0, 2] > 0:  # confidence > 0
+                    x, y = pose[0, :2].astype(int)
+                    cv2.putText(frame, str(idx_val), (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6, (0, 0, 0), 2, lineType=cv2.LINE_AA)
+                    
+                if idx_val in (ID_A, ID_B):
+                    id_to_pose[idx_val] = pose
+
+        # Highlight tracked IDs
+        pose_A = id_to_pose.get(ID_A)
+        pose_B = id_to_pose.get(ID_B)
+
+        if pose_A is not None:
+            draw_skeleton(frame, pose_A, (0, 0, 255))  # red
+        if pose_B is not None:
+            draw_skeleton(frame, pose_B, (255, 0, 0))  # blue
+
+        if pose_A is not None and pose_B is not None:
+            c1 = get_center(pose_A)
+            c2 = get_center(pose_B)
+            dist = np.linalg.norm(c1 - c2)
+            x1, y1 = c1.astype(int)
+            x2, y2 = c2.astype(int)
+            cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 0), 2, lineType=cv2.LINE_AA)
+            mx, my = ((x1 + x2) // 2, (y1 + y2) // 2)
+            cv2.putText(frame, f"{dist:.1f}", (mx, my), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+        else:
+            cv2.putText(frame, "ID Missing", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (50, 50, 50), 2)
 
         out_path = os.path.join(output_dir, f'plot_{idx}.png')
         cv2.imwrite(out_path, frame)
