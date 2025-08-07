@@ -1,41 +1,27 @@
 import json
 import numpy as np
-from collections import defaultdict
+from collections import defaultdict, deque
 
-# Load AlphaPose JSON
-with open("backupresults.json") as f:
-    data = json.load(f)
+# --- Parameters ---
+POSE_HISTORY = 10           # Rolling memory size
+MAX_CENTER_JUMP = 125      # Max pixels allowed between frames
+POSE_SIM_THRESHOLD = 0.30  # Pose distance threshold
+EMBED_SIM_THRESHOLD = 0.25  # Embedding distance threshold
 
-# Organize by frame
-frames_by_image = defaultdict(list)
-for entry in data:
-    frames_by_image[entry["image_id"]].append(entry)
-
-def frame_number(k): return int(k.split('.')[0])
-sorted_frame_keys = sorted(frames_by_image.keys(), key=frame_number)
-
-# --- Helpers ---
-def normalize_keypoints(kp):
-    kp = kp.copy()
+# Optional dummy embedding function (you can replace with real model)
+def pose_to_embedding(kp):
     visible = kp[:, 2] > 0
-    if not np.any(visible):
-        return kp
-    min_xy = np.min(kp[visible, :2], axis=0)
-    max_xy = np.max(kp[visible, :2], axis=0)
-    size = max_xy - min_xy
-    size[size == 0] = 1
-    kp[:, :2] = (kp[:, :2] - min_xy) / size
-    return kp
+    if not np.any(visible): return np.zeros(10)
+    flat = kp[visible, :2].flatten()
+    return flat / np.linalg.norm(flat) if np.linalg.norm(flat) else flat
 
 def pose_distance(kp1, kp2):
-    kp1 = normalize_keypoints(kp1)
-    kp2 = normalize_keypoints(kp2)
     mask = (kp1[:, 2] > 0) & (kp2[:, 2] > 0)
-    if np.sum(mask) == 0:
-        return np.inf
-    dist = np.linalg.norm(kp1[mask, :2] - kp2[mask, :2], axis=1)
-    conf = (kp1[mask, 2] + kp2[mask, 2]) / 2
-    return np.sum(dist * conf) / np.sum(conf)
+    if np.sum(mask) == 0: return np.inf
+    return np.mean(np.linalg.norm(kp1[mask, :2] - kp2[mask, :2], axis=1))
+
+def embedding_distance(e1, e2):
+    return np.linalg.norm(e1 - e2)
 
 def get_center(kp):
     try:
@@ -46,57 +32,87 @@ def get_center(kp):
         pass
     return kp[0, :2] if kp[0, 2] > 0 else np.array([0, 0])
 
-def spatial_distance(c1, c2):
-    return np.linalg.norm(c1 - c2)
+# --- Load Data ---
+with open("backupresults.json") as f:
+    data = json.load(f)
 
-# --- Fixed ID Pool (built from frame 0) ---
-id_templates = {}  # fixed_id → (keypoints, center)
-frame_0_key = sorted_frame_keys[0]
+frames_by_image = defaultdict(list)
+for entry in data:
+    frames_by_image[entry["image_id"]].append(entry)
+
+def frame_number(k): return int(k.split('.')[0])
+sorted_frame_keys = sorted(frames_by_image.keys(), key=frame_number)
+
+# --- Initialize Fixed ID Pool from Frame 0 ---
+frame0 = sorted_frame_keys[0]
+id_pose_history = {}     # id → deque of poses
+id_embeddings = {}       # id → fixed embedding
+id_centers = {}          # id → last known center
 next_id = 0
 
-# Assign initial IDs
-for person in frames_by_image[frame_0_key]:
+for person in frames_by_image[frame0]:
     kp = np.array(person["keypoints"]).reshape(-1, 3)
     cid = get_center(kp)
-    id_templates[next_id] = (kp, cid)
-    person["idx"] = next_id
+    person_id = next_id
     next_id += 1
 
-print(f"🧠 Initialized with {len(id_templates)} fixed IDs from frame 0")
+    id_pose_history[person_id] = deque([kp], maxlen=POSE_HISTORY)
+    id_embeddings[person_id] = pose_to_embedding(kp)
+    id_centers[person_id] = cid
+    person["idx"] = person_id
 
-# --- Track with fixed ID pool ---
-for frame_idx, frame in enumerate(sorted_frame_keys[1:], start=1):
-    current_entries = frames_by_image[frame]
+print(f"🧠 Initialized {len(id_pose_history)} fixed IDs from frame 0")
 
-    used_ids = set()
+# --- Track Through Remaining Frames ---
+for frame_idx, frame_key in enumerate(sorted_frame_keys[1:], start=1):
+    current_entries = frames_by_image[frame_key]
+    assigned_ids = set()
+
     for person in current_entries:
         kp = np.array(person["keypoints"]).reshape(-1, 3)
         center = get_center(kp)
+        embed = pose_to_embedding(kp)
 
-        # Match to fixed ID pool
         best_id = None
         best_score = float('inf')
 
-        for fixed_id, (ref_kp, ref_center) in id_templates.items():
-            if fixed_id in used_ids:
+        # 1️⃣ Pose History Matching
+        for pid in id_pose_history:
+            if pid in assigned_ids:
                 continue
-            pose_score = pose_distance(kp, ref_kp)
-            center_score = spatial_distance(center, ref_center) / 100
-            total_score = 0.7 * pose_score + 0.3 * center_score
-            if total_score < best_score:
-                best_score = total_score
-                best_id = fixed_id
+            for prev_kp in id_pose_history[pid]:
+                dist = pose_distance(kp, prev_kp)
+                if dist < best_score and dist < POSE_SIM_THRESHOLD:
+                    if np.linalg.norm(center - id_centers[pid]) < MAX_CENTER_JUMP:
+                        best_id = pid
+                        best_score = dist
 
+        # 2️⃣ Embedding Matching (fallback)
+        if best_id is None:
+            for pid in id_embeddings:
+                if pid in assigned_ids:
+                    continue
+                dist = embedding_distance(embed, id_embeddings[pid])
+                if dist < EMBED_SIM_THRESHOLD:
+                    if np.linalg.norm(center - id_centers[pid]) < MAX_CENTER_JUMP:
+                        best_id = pid
+                        best_score = dist
+                        print(f"[{frame_key}] 🧬 Embedding matched ID {pid} (score={dist:.2f})")
+
+        # 3️⃣ Assign or Skip
         if best_id is not None:
             person["idx"] = best_id
-            id_templates[best_id] = (kp, center)  # update template
-            used_ids.add(best_id)
-            print(f"[Frame {frame_idx}] Assigned ID {best_id} (score={best_score:.2f})")
+            id_pose_history[best_id].append(kp)
+            id_centers[best_id] = center
+            assigned_ids.add(best_id)
+            print(f"[{frame_key}] ✅ Assigned ID {best_id}")
         else:
-            print(f"[Frame {frame_idx}] ❌ No match found — dropping detection")
+            person["skip"] = True  # flag to skip in output
+            print(f"[{frame_key}] ⏩ Skipped unmatched person")
 
-# Save output
+data = [entry for entry in data if not entry.get("skip")]
+# --- Save Output ---
 with open("result_recycled.json", "w") as f:
     json.dump(data, f, indent=2)
 
-print("✅ Saved to result_recycled.json with fixed ID pool")
+print("✅ Saved to result_recycled.json with fixed IDs only")
