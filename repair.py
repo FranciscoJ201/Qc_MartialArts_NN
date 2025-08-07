@@ -3,10 +3,10 @@ import numpy as np
 from collections import defaultdict, deque
 
 # --- Parameters ---
-POSE_HISTORY = 10           # Rolling memory size
-MAX_CENTER_JUMP = 125      # Max pixels allowed between frames
-POSE_SIM_THRESHOLD = 0.30  # Pose distance threshold
-EMBED_SIM_THRESHOLD = 0.25  # Embedding distance threshold
+POSE_HISTORY = 20           # Rolling memory size 20
+MAX_CENTER_JUMP = 125      # Max pixels allowed between frames 125
+POSE_SIM_THRESHOLD = 0.35  # Pose distance threshold .35
+EMBED_SIM_THRESHOLD = 0.3  # Embedding distance threshold .3
 
 # Optional dummy embedding function (you can replace with real model)
 def pose_to_embedding(kp):
