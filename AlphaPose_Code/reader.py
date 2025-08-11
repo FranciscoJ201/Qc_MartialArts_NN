@@ -7,7 +7,9 @@ from tkinter import filedialog, messagebox
 from videoCreator import make_video
 from folderclear import clear_all
 import time
-#comment
+
+# --- Helpers ---
+
 def get_center(kp):
     try:
         hips = kp[[11, 12]]
@@ -37,6 +39,35 @@ def draw_skeleton(frame, keypoints, color):
             pt = tuple(keypoints[i, :2].astype(int))
             cv2.circle(frame, pt, 3, color, -1)
 
+def draw_axes(frame, step=100, grid_color=(200, 200, 200)):
+    """Draw grid and axis labels with dark, outlined text for readability."""
+    h, w = frame.shape[:2]
+
+    for x in range(0, w, step):
+        cv2.line(frame, (x, 0), (x, h), grid_color, 1)
+        _put_text_with_outline(frame, str(x), (x + 2, 15))
+
+    for y in range(0, h, step):
+        cv2.line(frame, (0, y), (w, y), grid_color, 1)
+        _put_text_with_outline(frame, str(y), (2, max(12, y - 2)))
+
+    # Bold axis lines
+    cv2.line(frame, (0, 0), (w, 0), (0, 0, 0), 2)
+    cv2.line(frame, (0, 0), (0, h), (0, 0, 0), 2)
+    _put_text_with_outline(frame, "X", (w - 20, 20), scale=0.6)
+    _put_text_with_outline(frame, "Y", (10, h - 10), scale=0.6)
+
+def _put_text_with_outline(frame, text, org, scale=0.4):
+    """Draw text with white outline and black fill for visibility."""
+    # Outline
+    cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX,
+                scale, (255, 255, 255), 3, lineType=cv2.LINE_AA)
+    # Fill
+    cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX,
+                scale, (0, 0, 0), 1, lineType=cv2.LINE_AA)
+
+# --- Core ---
+
 def convert_json_to_opencv_images(json_path, video_path, output_dir):
     os.makedirs(output_dir, exist_ok=True)
 
@@ -58,12 +89,14 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
 
     ID_A = 2
     ID_B = 1
-
     start_time = time.perf_counter()
 
     for idx, fid in enumerate(sorted_fids):
         id_to_pose = {}
         frame = np.ones((h_res, w_res, 3), dtype=np.uint8) * 255
+
+        # ✅ Draw axis/grid first
+        draw_axes(frame, step=100)
 
         # Draw all people in gray
         for person in frames[fid]:
@@ -71,13 +104,10 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
             kp = np.array(person["keypoints"], dtype=float)
             if kp.size == 51:
                 pose = kp.reshape(-1, 3)
-                draw_skeleton(frame, pose, (180, 180, 180))  # light gray
-                # Label ID above the nose if visible
-                if pose[0, 2] > 0:  # confidence > 0
+                draw_skeleton(frame, pose, (180, 180, 180))
+                if pose[0, 2] > 0:
                     x, y = pose[0, :2].astype(int)
-                    cv2.putText(frame, str(idx_val), (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.6, (0, 0, 0), 2, lineType=cv2.LINE_AA)
-                    
+                    _put_text_with_outline(frame, str(idx_val), (x, max(0, y - 10)), scale=0.6)
                 if idx_val in (ID_A, ID_B):
                     id_to_pose[idx_val] = pose
 
@@ -86,9 +116,9 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
         pose_B = id_to_pose.get(ID_B)
 
         if pose_A is not None:
-            draw_skeleton(frame, pose_A, (0, 0, 255))  # red
+            draw_skeleton(frame, pose_A, (0, 0, 255))
         if pose_B is not None:
-            draw_skeleton(frame, pose_B, (255, 0, 0))  # blue
+            draw_skeleton(frame, pose_B, (255, 0, 0))
 
         if pose_A is not None and pose_B is not None:
             c1 = get_center(pose_A)
@@ -98,9 +128,9 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
             x2, y2 = c2.astype(int)
             cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 0), 2, lineType=cv2.LINE_AA)
             mx, my = ((x1 + x2) // 2, (y1 + y2) // 2)
-            cv2.putText(frame, f"{dist:.1f}", (mx, my), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            _put_text_with_outline(frame, f"{dist:.1f}", (mx, my), scale=0.6)
         else:
-            cv2.putText(frame, "ID Missing", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (50, 50, 50), 2)
+            _put_text_with_outline(frame, "ID Missing", (20, 40), scale=0.9)
 
         out_path = os.path.join(output_dir, f'plot_{idx}.png')
         cv2.imwrite(out_path, frame)
