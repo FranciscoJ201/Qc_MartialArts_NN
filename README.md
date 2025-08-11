@@ -8,7 +8,6 @@ It provides tools to:
 - Measure distances between selected tracked IDs in a video.
 - Interactively select frame ranges for further analysis.
 - Convert JSON keypoint data back into videos with overlaid poses.
-- Organize and store potential future tasks (`otherTasks`) and fix-related work (`dataFIX`).
 
 ---
 
