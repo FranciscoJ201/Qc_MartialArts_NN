@@ -90,7 +90,6 @@ This opens a GUI where you:
 ---
 
 ## Future Improvements
-- Integrate pose repair script to maintain consistent IDs when AlphaPose tracking changes unexpectedly.
 - Add metric conversion for distances (pixels → meters).
 - Batch processing for multiple JSON/video pairs.
 - Optional optical flow continuity for smoother tracking.
