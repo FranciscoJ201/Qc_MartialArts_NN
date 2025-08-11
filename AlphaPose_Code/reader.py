@@ -56,7 +56,7 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
 
     sorted_fids = sorted(frames.keys(), key=frame_num)
 
-    ID_A = 0
+    ID_A = 2
     ID_B = 1
 
     start_time = time.perf_counter()
