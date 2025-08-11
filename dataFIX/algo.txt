@@ -1,0 +1,14 @@
+save each initial id with its inital keypoints in a data structure for previous ids for example a dict with its id then value pair of keypoints
+
+for each frame in the json:
+    for each id in frame:
+        if id = previous_id
+            check if keypoints logically make sense, for example couldnt have teleported 1000 pixels across the screen
+            else skip that person until logical keypoints for them reappear within rougly 200 pixels
+
+ALGO #2
+- should include pose history
+- pixel detection (if another reappears on the other side of the screen it should not be mapped to the same index, people cant travel that far that quick)
+
+
+
