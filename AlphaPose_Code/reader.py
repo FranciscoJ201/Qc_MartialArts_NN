@@ -40,35 +40,27 @@ def draw_skeleton(frame, keypoints, color):
             cv2.circle(frame, pt, 3, color, -1)
 
 def draw_axes(frame, step=100, grid_color=(200, 200, 200)):
-    """Draw grid and axis labels with dark, outlined text for readability."""
     h, w = frame.shape[:2]
-
     for x in range(0, w, step):
         cv2.line(frame, (x, 0), (x, h), grid_color, 1)
         _put_text_with_outline(frame, str(x), (x + 2, 15))
-
     for y in range(0, h, step):
         cv2.line(frame, (0, y), (w, y), grid_color, 1)
         _put_text_with_outline(frame, str(y), (2, max(12, y - 2)))
-
-    # Bold axis lines
     cv2.line(frame, (0, 0), (w, 0), (0, 0, 0), 2)
     cv2.line(frame, (0, 0), (0, h), (0, 0, 0), 2)
     _put_text_with_outline(frame, "X", (w - 20, 20), scale=0.6)
     _put_text_with_outline(frame, "Y", (10, h - 10), scale=0.6)
 
 def _put_text_with_outline(frame, text, org, scale=0.4):
-    """Draw text with white outline and black fill for visibility."""
-    # Outline
     cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX,
                 scale, (255, 255, 255), 3, lineType=cv2.LINE_AA)
-    # Fill
     cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX,
                 scale, (0, 0, 0), 1, lineType=cv2.LINE_AA)
 
 # --- Core ---
 
-def convert_json_to_opencv_images(json_path, video_path, output_dir):
+def convert_json_to_opencv_images(json_path, video_path, output_dir, plot_distance=False):
     os.makedirs(output_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
@@ -95,15 +87,14 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
         id_to_pose = {}
         frame = np.ones((h_res, w_res, 3), dtype=np.uint8) * 255
 
-        # ✅ Draw axis/grid first
         draw_axes(frame, step=100)
 
-        # Draw all people in gray
         for person in frames[fid]:
             idx_val = person.get("idx")
             kp = np.array(person["keypoints"], dtype=float)
             if kp.size == 51:
                 pose = kp.reshape(-1, 3)
+                # context in gray
                 draw_skeleton(frame, pose, (180, 180, 180))
                 if pose[0, 2] > 0:
                     x, y = pose[0, :2].astype(int)
@@ -114,13 +105,13 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
         # Highlight tracked IDs
         pose_A = id_to_pose.get(ID_A)
         pose_B = id_to_pose.get(ID_B)
-
         if pose_A is not None:
             draw_skeleton(frame, pose_A, (0, 0, 255))
         if pose_B is not None:
             draw_skeleton(frame, pose_B, (255, 0, 0))
 
-        if pose_A is not None and pose_B is not None:
+        # ✅ Conditionally plot distance
+        if plot_distance and (pose_A is not None) and (pose_B is not None):
             c1 = get_center(pose_A)
             c2 = get_center(pose_B)
             dist = np.linalg.norm(c1 - c2)
@@ -129,7 +120,7 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
             cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 0), 2, lineType=cv2.LINE_AA)
             mx, my = ((x1 + x2) // 2, (y1 + y2) // 2)
             _put_text_with_outline(frame, f"{dist:.1f}", (mx, my), scale=0.6)
-        else:
+        elif (pose_A is None) or (pose_B is None):
             _put_text_with_outline(frame, "ID Missing", (20, 40), scale=0.9)
 
         out_path = os.path.join(output_dir, f'plot_{idx}.png')
@@ -140,7 +131,8 @@ def convert_json_to_opencv_images(json_path, video_path, output_dir):
 
     return output_dir
 
-def run_pose_plotter():
+def run_pose_plotter(plot_distance=False):
+    """Launches the two-person reader flow. Set plot_distance to toggle drawing the distance."""
     result = {"json": None, "video": None, "name": None}
 
     def browse_json():
@@ -176,7 +168,8 @@ def run_pose_plotter():
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         clear_all()
 
-        convert_json_to_opencv_images(json_path, video_path, OUTPUT_DIR)
+        # pass the flag through
+        convert_json_to_opencv_images(json_path, video_path, OUTPUT_DIR, plot_distance=plot_distance)
         make_video(video_name, video_path)
 
         result["json"] = json_path

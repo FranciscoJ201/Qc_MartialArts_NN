@@ -1,16 +1,104 @@
 import os
 import json
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import cv2
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from videoCreator import make_video
 from folderclear import clear_all
 import time
-import sys
+
+# --- Helpers (copied from reader.py) ---
+
+def frame_num(fname):
+    return int(os.path.splitext(os.path.basename(fname))[0])
+
+def draw_skeleton(frame, keypoints, color):
+    EDGES = [
+        (0, 1), (0, 2), (1, 3), (2, 4),
+        (0, 5), (0, 6), (5, 7), (7, 9),
+        (6, 8), (8, 10), (5, 11), (6, 12),
+        (11, 13), (13, 15), (12, 14), (14, 16)
+    ]
+    for i, j in EDGES:
+        if keypoints[i, 2] > 0 and keypoints[j, 2] > 0:
+            pt1 = tuple(keypoints[i, :2].astype(int))
+            pt2 = tuple(keypoints[j, :2].astype(int))
+            cv2.line(frame, pt1, pt2, color, 2)
+    for i in range(len(keypoints)):
+        if keypoints[i, 2] > 0:
+            pt = tuple(keypoints[i, :2].astype(int))
+            cv2.circle(frame, pt, 3, color, -1)
+
+def draw_axes(frame, step=100, grid_color=(200, 200, 200)):
+    h, w = frame.shape[:2]
+    for x in range(0, w, step):
+        cv2.line(frame, (x, 0), (x, h), grid_color, 1)
+        _put_text_with_outline(frame, str(x), (x + 2, 15))
+    for y in range(0, h, step):
+        cv2.line(frame, (0, y), (w, y), grid_color, 1)
+        _put_text_with_outline(frame, str(y), (2, max(12, y - 2)))
+    cv2.line(frame, (0, 0), (w, 0), (0, 0, 0), 2)
+    cv2.line(frame, (0, 0), (0, h), (0, 0, 0), 2)
+    _put_text_with_outline(frame, "X", (w - 20, 20), scale=0.6)
+    _put_text_with_outline(frame, "Y", (10, h - 10), scale=0.6)
+
+def _put_text_with_outline(frame, text, org, scale=0.4):
+    cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX,
+                scale, (255, 255, 255), 3, lineType=cv2.LINE_AA)
+    cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX,
+                scale, (0, 0, 0), 1, lineType=cv2.LINE_AA)
+
+# --- Core ---
+
+def convert_single_json_to_images(json_path, video_path, output_dir, target_id):
+    os.makedirs(output_dir, exist_ok=True)
+
+    cap = cv2.VideoCapture(video_path)
+    w_res = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h_res = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cap.release()
+
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+
+    frames = {}
+    for entry in data:
+        fid = entry.get('image_id')
+        if fid:
+            frames.setdefault(fid, []).append(entry)
+
+    sorted_fids = sorted(frames.keys(), key=frame_num)
+    start_time = time.perf_counter()
+
+    for idx, fid in enumerate(sorted_fids):
+        frame = np.ones((h_res, w_res, 3), dtype=np.uint8) * 255
+        draw_axes(frame, step=100)
+
+        pose_drawn = False
+        for person in frames[fid]:
+            idx_val = person.get("idx")
+            if idx_val != target_id:
+                continue
+            kp = np.array(person["keypoints"], dtype=float)
+            if kp.size == 51:
+                pose = kp.reshape(-1, 3)
+                draw_skeleton(frame, pose, (0, 0, 255))
+                if pose[0, 2] > 0:
+                    x, y = pose[0, :2].astype(int)
+                    _put_text_with_outline(frame, f"ID {idx_val}", (x, max(0, y - 10)), scale=0.6)
+                pose_drawn = True
+
+        if not pose_drawn:
+            _put_text_with_outline(frame, f"ID {target_id} Missing", (20, 40), scale=0.9)
+
+        out_path = os.path.join(output_dir, f'plot_{idx}.png')
+        cv2.imwrite(out_path, frame)
+
+        elapsed = time.perf_counter() - start_time
+        print(f"Frame {idx+1}/{len(sorted_fids)} • Elapsed: {elapsed:.2f}s")
+
+    return output_dir
 
 def run_single_pose_plotter():
     result = {"json": None, "video": None, "name": None}
@@ -23,15 +111,14 @@ def run_single_pose_plotter():
         if not path:
             return
         json_path_var.set(path)
-
         try:
             with open(path, 'r') as f:
                 raw_data = json.load(f)
             available_ids = sorted({entry.get("idx") for entry in raw_data if "idx" in entry})
-            if not available_ids:
-                messagebox.showerror("No IDs Found", "No 'idx' values found in JSON file. Was pose tracking enabled?")
-            else:
+            if available_ids:
                 messagebox.showinfo("Available Person IDs", f"Detected person IDs: {available_ids}")
+            else:
+                messagebox.showerror("No IDs Found", "No 'idx' values found in JSON file.")
         except Exception as e:
             messagebox.showerror("JSON Error", f"Failed to read JSON: {str(e)}")
 
@@ -65,94 +152,26 @@ def run_single_pose_plotter():
 
         with open(json_path, 'r') as f:
             raw_data = json.load(f)
-
         available_ids = sorted({entry.get("idx") for entry in raw_data if "idx" in entry})
         if selected_index not in available_ids:
             messagebox.showerror("Invalid ID", f"ID {selected_index} not found in JSON. Available: {available_ids}")
             return
 
         OUTPUT_DIR = 'AlphaPose_Code/output_plots'
-        dpi = 100
-
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         clear_all()
 
-        cap = cv2.VideoCapture(video_path)
-        w_res = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        h_res = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        cap.release()
-
-        fig_w = w_res / dpi
-        fig_h = h_res / dpi
-
-        EDGES = [
-            (0, 1), (0, 2), (1, 3), (2, 4),
-            (0, 5), (0, 6), (5, 7), (7, 9),
-            (6, 8), (8, 10), (5, 11), (6, 12),
-            (11, 13), (13, 15), (12, 14), (14, 16)
-        ]
-
-        frames = {}
-        for entry in raw_data:
-            fid = entry.get('image_id')
-            if fid is not None:
-                frames.setdefault(fid, []).append(entry)
-
-        def frame_num(fname):
-            name, _ = os.path.splitext(os.path.basename(fname))
-            return int(name)
-
-        sorted_fids = sorted(frames.keys(), key=frame_num)
-        total = len(sorted_fids)
-        start_time = time.perf_counter()
-
-        for frame_idx, fid in enumerate(sorted_fids):
-            people = []
-            for person in frames[fid]:
-                if person.get("idx") == selected_index:
-                    kp = np.array(person['keypoints'], dtype=float)
-                    if kp.size % 3 == 0:
-                        people.append(kp.reshape(-1, 3))
-            if not people:
-                continue
-
-            fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-            for person in people:
-                visible = person[:, 2] > 0
-                ax.plot(person[visible, 0], person[visible, 1], 'o')
-                for i, j in EDGES:
-                    if person[i, 2] > 0 and person[j, 2] > 0:
-                        ax.plot([person[i, 0], person[j, 0]], [person[i, 1], person[j, 1]], color='red')
-
-            ax.invert_yaxis()
-            ax.set_xlim(0, w_res)
-            ax.set_ylim(h_res, 0)
-            ax.axis('off')
-
-            out_path = os.path.join(OUTPUT_DIR, f'plot_{frame_idx}.png')
-            fig.savefig(out_path, bbox_inches='tight', pad_inches=0)
-            plt.close(fig)
-
-            elapsed = time.perf_counter() - start_time
-            sys.stdout.write(f"\rFrame {frame_idx+1}/{total} • Elapsed: {elapsed:.2f}s")
-            sys.stdout.flush()
-
-        end_time = time.perf_counter()
-        print("\nDone!")
-        print(f"Generated {len(sorted_fids)} plots in {end_time - start_time:.2f} seconds.")
-
+        convert_single_json_to_images(json_path, video_path, OUTPUT_DIR, selected_index)
         make_video(video_name, video_path)
 
         result["json"] = json_path
         result["video"] = video_path
         result["name"] = video_name
-
         root.quit()
         root.destroy()
 
-    # GUI Setup
     root = tk.Tk()
-    root.title("Pose Plotter GUI")
+    root.title("Single Person Pose Plotter")
 
     json_path_var = tk.StringVar()
     video_path_var = tk.StringVar()
@@ -169,12 +188,11 @@ def run_single_pose_plotter():
     video_name_entry = tk.Entry(root)
     video_name_entry.grid(row=2, column=1)
 
-    tk.Label(root, text="Person ID (index):").grid(row=3, column=0, sticky="e")
+    tk.Label(root, text="Person ID (idx):").grid(row=3, column=0, sticky="e")
     person_id_entry = tk.Entry(root)
     person_id_entry.grid(row=3, column=1)
 
     tk.Button(root, text="Run Pose Plotter", command=run_processing).grid(row=4, column=1, pady=10)
-
     root.mainloop()
 
     return result["json"], result["video"], result["name"]
