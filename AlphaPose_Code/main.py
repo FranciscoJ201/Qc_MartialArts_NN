@@ -68,20 +68,20 @@ if __name__ == "__main__":
 
     ttk.Label(container, text="View mode:").grid(row=0, column=0, sticky="w")
     mode_var = tk.StringVar(value="single")
-    ttk.Radiobutton(container, text="Single Person", variable=mode_var, value="single").grid(row=1, column=0, sticky="w", pady=(4, 0))
-    ttk.Radiobutton(container, text="Two‑person (reader)", variable=mode_var, value="reader").grid(row=2, column=0, sticky="w")
+    ttk.Radiobutton(container, text="Single Person Selection", variable=mode_var, value="single").grid(row=1, column=0, sticky="w", pady=(4, 0))
+    ttk.Radiobutton(container, text="Two Person Selection (Includes Background People Greyed Out)", variable=mode_var, value="reader").grid(row=2, column=0, sticky="w")
 
     ttk.Separator(container).grid(row=3, column=0, sticky="ew", pady=10)
 
     repair_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(container, text="Run repair first (repair2.py → repaired.json)", variable=repair_var).grid(row=4, column=0, sticky="w")
+    ttk.Checkbutton(container, text="Run repair first (repair2.py → repaired.json) REQUIRED FOR ACCURATE ID TRACKING", variable=repair_var).grid(row=4, column=0, sticky="w")
 
     # NEW: distance plotting toggle (only affects reader)
     plot_distance_var = tk.BooleanVar(value=True)
-    ttk.Checkbutton(container, text="Plot distance (reader only)", variable=plot_distance_var).grid(row=5, column=0, sticky="w", pady=(6, 0))
+    ttk.Checkbutton(container, text="Plot distance (Two Person only)", variable=plot_distance_var).grid(row=5, column=0, sticky="w", pady=(6, 0))
 
     frames_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(container, text="Run Frame Selector after plotting", variable=frames_var).grid(row=6, column=0, sticky="w", pady=(8, 0))
+    ttk.Checkbutton(container, text="Run Frame Selector after plotting (Outputs a range of frames into selected_frames folder)", variable=frames_var).grid(row=6, column=0, sticky="w", pady=(8, 0))
 
     btns = ttk.Frame(container)
     btns.grid(row=7, column=0, sticky="e", pady=(12, 0))
