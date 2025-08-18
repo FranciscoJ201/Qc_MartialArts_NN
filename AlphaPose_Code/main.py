@@ -7,10 +7,11 @@ import runpy
 from reader import run_pose_plotter
 from singleReader import run_single_pose_plotter
 from frameGUIandSelect import frame_selector
+from reader_3d import run_pose_plotter_3d
 
 def run_repair():
     try:
-        runpy.run_path("repair2.py", run_name="__main__")
+        runpy.run_path("AlphaPose_Code/repair2.py", run_name="__main__")
         if not os.path.exists("repaired.json"):
             raise FileNotFoundError("repaired.json was not created.")
         messagebox.showinfo(
@@ -40,6 +41,8 @@ def launch():
         elif mode == "reader":
             # pass the bool into reader
             json_path, video_path, name = run_pose_plotter(plot_distance=plot_dist)
+        elif mode =="3d":
+            json_path, video_path, name = run_pose_plotter_3d()
         else:
             messagebox.showerror("No selection", "Choose Single or Two‑person view.")
             return
@@ -70,21 +73,21 @@ if __name__ == "__main__":
     mode_var = tk.StringVar(value="single")
     ttk.Radiobutton(container, text="Single Person Selection", variable=mode_var, value="single").grid(row=1, column=0, sticky="w", pady=(4, 0))
     ttk.Radiobutton(container, text="Two Person Selection (Includes Background People Greyed Out)", variable=mode_var, value="reader").grid(row=2, column=0, sticky="w")
-
-    ttk.Separator(container).grid(row=3, column=0, sticky="ew", pady=10)
+    ttk.Radiobutton(container, text="3d Reader (Other People Greyed Out)", variable=mode_var, value="3d").grid(row=3, column=0, sticky="w")
+    ttk.Separator(container).grid(row=4, column=0, sticky="ew", pady=10)
 
     repair_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(container, text="Run repair first (repair2.py → repaired.json) REQUIRED FOR ACCURATE ID TRACKING", variable=repair_var).grid(row=4, column=0, sticky="w")
+    ttk.Checkbutton(container, text="Run repair first (repair2.py → repaired.json) REQUIRED FOR ACCURATE ID TRACKING", variable=repair_var).grid(row=5, column=0, sticky="w")
 
     # NEW: distance plotting toggle (only affects reader)
-    plot_distance_var = tk.BooleanVar(value=True)
-    ttk.Checkbutton(container, text="Plot distance (Two Person only)", variable=plot_distance_var).grid(row=5, column=0, sticky="w", pady=(6, 0))
+    plot_distance_var = tk.BooleanVar(value=False)
+    ttk.Checkbutton(container, text="Plot distance (Two Person only)", variable=plot_distance_var).grid(row=6, column=0, sticky="w", pady=(6, 0))
 
     frames_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(container, text="Run Frame Selector after plotting (Outputs a range of frames into selected_frames folder)", variable=frames_var).grid(row=6, column=0, sticky="w", pady=(8, 0))
+    ttk.Checkbutton(container, text="Run Frame Selector after plotting (Outputs a range of frames into selected_frames folder)", variable=frames_var).grid(row=7, column=0, sticky="w", pady=(8, 0))
 
     btns = ttk.Frame(container)
-    btns.grid(row=7, column=0, sticky="e", pady=(12, 0))
+    btns.grid(row=8, column=0, sticky="e", pady=(12, 0))
     ttk.Button(btns, text="Launch", command=launch).grid(row=0, column=0, padx=(0, 8))
     ttk.Button(btns, text="Cancel", command=root.destroy).grid(row=0, column=1)
 
