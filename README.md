@@ -193,32 +193,12 @@ frame_selector("path/to/repaired.json", "path/to/video.mp4")
 
 ---
 
-## 🤝 Contributing
-
-PRs are welcome! If you add features, please include a short demo, sample JSON, or a test video snippet showing the change.
-
----
-
-## 📄 License
-
-MIT (proposed). If you prefer a different license, update this section.
-
----
 
 ## 🙏 Acknowledgments
 
 - **AlphaPose** for 2D pose estimation
-- Early testers who helped find rough edges in the ID repair + GUI flows
 
 ---
 
-## 📸 (Optional) Demo
 
-Add GIFs or screenshots of:
-
-- Two‑person distance overlay
-- Single‑subject highlight
-- Frame selector GUI
-
-> Drop images in `docs/` and link them here once you have them.
 
