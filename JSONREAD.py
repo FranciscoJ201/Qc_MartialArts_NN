@@ -2,8 +2,6 @@ import json
 import numpy as np
 from collections import defaultdict, deque
 
-
-
 #CONSTANTS 
 INPUT_PATH = 'example2.json'
 OUTPUT_PATH = 'Test.json'

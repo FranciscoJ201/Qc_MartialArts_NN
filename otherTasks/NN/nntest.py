@@ -23,8 +23,8 @@ transform = Compose([
 ])
 
 # --- Dataset & Dataloaders ---
-train_data = ImageFolder(root='NeuralNetwork/martial_arts_dataset/train', transform=transform)
-test_data = ImageFolder(root='NeuralNetwork/martial_arts_dataset/test', transform=transform)
+train_data = ImageFolder(root='otherTasks/NN/martial_arts_dataset/train', transform=transform)
+test_data = ImageFolder(root='otherTasks/NN/martial_arts_dataset/test', transform=transform)
 
 train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_data, batch_size=batch_size)
