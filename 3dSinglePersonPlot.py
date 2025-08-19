@@ -172,10 +172,10 @@ class Pose3DPlayer:
             self.ax.set_xlim(lo, hi)
             self.ax.set_ylim(lo, hi)
             self.ax.set_zlim(lo, hi)
-
-        self.ax.set_xlabel("X")
-        self.ax.set_ylabel("Y")
-        self.ax.set_zlabel("Z")
+        #they arent initially set to the right thing so change them here
+        self.ax.set_xlabel("Y")
+        self.ax.set_ylabel("Z")
+        self.ax.set_zlabel("X")
 
     # ---------- UI ----------
     def _add_widgets(self):
@@ -198,7 +198,7 @@ class Pose3DPlayer:
         self.slider = Slider(ax_slider, "Frame", 0, len(self.keys) - 1, valinit=self.i, valstep=1)
 
         self.fps_slider = Slider(ax_fps, "FPS", 1, 60, valinit=self.fps, valstep=1)
-
+        self.ax.view_init(elev=110, azim=90)
         self.btn_prev.on_clicked(lambda evt: self.step(-1))
         self.btn_next.on_clicked(lambda evt: self.step(1))
         self.btn_play.on_clicked(lambda evt: self.toggle_play())
@@ -214,7 +214,7 @@ class Pose3DPlayer:
         elif event.key == "right":
             self.step(1)
         elif event.key == "r":
-            self.ax.view_init(elev=20, azim=-60)
+            self.ax.view_init(elev=90, azim=90)
             self.fig.canvas.draw_idle()
         elif event.key == "q":
             plt.close(self.fig)
@@ -300,10 +300,9 @@ if __name__ == "__main__":
     # - Set json_path to your AlphaPose 3D output that contains 'pred_xyz_jts'
     # - Optionally set target_idx to a specific track id after running your repair step
     json_path = "/Users/franciscojimenez/Desktop/repaired.json"
-    # json_path = " "
     viewer = Pose3DPlayer(
         json_path=json_path,
-        target_idx=2,        # or an integer track id, e.g., 0 or 1
+        target_idx=1,        # or an integer track id, e.g., 0 or 1
         edges=SMPL24_EDGES,
         fps=30,
         fixed_limits= lim,     
