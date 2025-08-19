@@ -12,7 +12,7 @@ from tkinter import filedialog, messagebox
 # ----------------------------
 POSE_HISTORY = 5            # how many past poses per ID to keep
 MAX_CENTER_JUMP = 150.0     # max pixels a person can move between frames
-POSE_SIM_THRESHOLD = 0.9    # lower = stricter (0 ~ identical after normalization)
+POSE_SIM_THRESHOLD = 1.2    # lower = stricter (0 ~ identical after normalization)
 CENTER_WEIGHT = 0.3         # blend center distance into the score
 POSE_WEIGHT = 0.7           # blend pose distance into the score
 OUTPUT_JSON = "repaired.json"
