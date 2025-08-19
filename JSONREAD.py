@@ -3,7 +3,7 @@ import numpy as np
 from collections import defaultdict, deque
 
 #CONSTANTS 
-INPUT_PATH = 'example2.json'
+INPUT_PATH = 'JSON_FILES/3d/3d.json'
 OUTPUT_PATH = 'Test.json'
 def frame_number(k: str) -> int:
     # turns "000123.jpg" -> 123, "123.png" -> 123, "img_123.jpg" -> 123
@@ -34,12 +34,12 @@ first_frame = sorted_frame_keys[0]
 
 pose_dict = {}
 for id in initial_ids:
-    pose_dict[id] = []
+    pose_dict["Id:" + str(id)] = []
 
 for key in sorted_frame_keys:
     for entry in framedata[key]:
         idx = entry['idx']
-        pose_dict[idx].append(entry['keypoints'])
+        pose_dict["Id:" + str(idx)].append(entry['keypoints'])
 #each keypoint entry is already ordered because the JSON its drawing from is ordered so pose_dict[1][0]
 #is equivalent to keypoints for idx 1 at frame 0
 
