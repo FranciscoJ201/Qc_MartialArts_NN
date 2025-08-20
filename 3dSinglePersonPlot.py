@@ -1,14 +1,15 @@
-# reader3d_video.py
 import json, os
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (needed for 3D)
-from matplotlib.widgets import Button, Slider
+from matplotlib.widgets import Button, Slider, TextBox
+from JSON_FILES.JSONREAD import filecleanup, filecleanupsingle
 
 
 
 #CONSTS ---------
 lim = (-1.5,1.5)
+JSON_PATH = "C:/Users/Francisco Jimenez/Desktop/repaired.json"
 # lim = None
 #----------------
 
@@ -103,6 +104,10 @@ class Pose3DPlayer:
         self.i = 0
         self.playing = False
 
+        # NEW: frame-range state (just collected, not used)
+        self.selected_start = 0
+        self.selected_end = len(self.keys) - 1
+
         # figure + axes
         self.fig = plt.figure(figsize=(8, 7))
         self.ax = self.fig.add_subplot(111, projection="3d")
@@ -179,31 +184,50 @@ class Pose3DPlayer:
 
     # ---------- UI ----------
     def _add_widgets(self):
-        # layout: reserve space at bottom
-        plt.subplots_adjust(bottom=0.18)  # or a bit more if you need space
+        # Make extra room at the bottom for the new range slider
+             # a bit more space for inputs
+        plt.subplots_adjust(bottom=0.30)
 
-        ax_prev   = plt.axes([0.12, 0.10, 0.10, 0.06])
-        ax_play   = plt.axes([0.24, 0.10, 0.12, 0.06])
-        ax_next   = plt.axes([0.38, 0.10, 0.10, 0.06])
+        # Buttons row
+        ax_prev   = plt.axes([0.12, 0.20, 0.10, 0.06])
+        ax_play   = plt.axes([0.24, 0.20, 0.12, 0.06])
+        ax_next   = plt.axes([0.38, 0.20, 0.10, 0.06])
+        ax_fps    = plt.axes([0.55, 0.20, 0.25, 0.06])
 
-        # ⬇️ Move the frame slider to span the bottom
+        # NEW: Start/End text inputs + Save
+        ax_start  = plt.axes([0.12, 0.12, 0.18, 0.06])
+        ax_end    = plt.axes([0.33, 0.12, 0.18, 0.06])
+        ax_save   = plt.axes([0.55, 0.12, 0.10, 0.06])
+
+        # Existing single-frame slider
         ax_slider = plt.axes([0.12, 0.04, 0.76, 0.04])
 
-        # Keep FPS just above or beside buttons (your call)
-        ax_fps    = plt.axes([0.55, 0.10, 0.38, 0.06])
+        self.btn_prev   = Button(ax_prev, "Prev")
+        self.btn_play   = Button(ax_play, "Play")
+        self.btn_next   = Button(ax_next, "Next")
+        self.btn_save   = Button(ax_save, "Save Range")
 
-        self.btn_prev = Button(ax_prev, "Prev")
-        self.btn_play = Button(ax_play, "Play")
-        self.btn_next = Button(ax_next, "Next")
-        self.slider = Slider(ax_slider, "Frame", 0, len(self.keys) - 1, valinit=self.i, valstep=1)
+        # NEW: text boxes (type numbers, press Enter)
+        self.tb_start = TextBox(ax_start, "Start", initial=str(self.selected_start))
+        self.tb_end   = TextBox(ax_end,   "End",   initial=str(self.selected_end))
 
+        self.slider     = Slider(ax_slider, "Frame", 0, len(self.keys) - 1, valinit=self.i, valstep=1)
         self.fps_slider = Slider(ax_fps, "FPS", 1, 60, valinit=self.fps, valstep=1)
+
+        # camera view preset
         self.ax.view_init(elev=110, azim=90)
+
+        # wire up controls
         self.btn_prev.on_clicked(lambda evt: self.step(-1))
         self.btn_next.on_clicked(lambda evt: self.step(1))
         self.btn_play.on_clicked(lambda evt: self.toggle_play())
+
+        self.tb_start.on_submit(self._on_start_submit)
+        self.tb_end.on_submit(self._on_end_submit)
+        self.btn_save.on_clicked(self._on_mark_range)
+
         self.slider.on_changed(self._on_slider)
-        self.fps_slider.on_changed(self._on_fps_changed)  # NEW
+        self.fps_slider.on_changed(self._on_fps_changed)
 
     # ---------- Events ----------
     def _on_key(self, event):
@@ -240,6 +264,36 @@ class Pose3DPlayer:
             return
         self.i = (self.i + 1) % len(self.keys)
         self.slider.set_val(self.i)  # also triggers _draw_frame
+
+    #-----------Handlers-----------
+    def _clamp_idx(self, v: int) -> int:
+        return max(0, min(len(self.keys) - 1, v))
+
+    def _on_start_submit(self, text):
+        try:
+            v = int(float(text))  # accept "12", "12.0"
+        except ValueError:
+            v = self.selected_start  # ignore bad input
+        v = self._clamp_idx(v)
+        # ensure start <= end
+        if v > self.selected_end:
+            self.selected_end = v
+            self.tb_end.set_val(str(self.selected_end))
+        self.selected_start = v
+        self.tb_start.set_val(str(self.selected_start))
+
+    def _on_end_submit(self, text):
+        try:
+            v = int(float(text))
+        except ValueError:
+            v = self.selected_end
+        v = self._clamp_idx(v)
+        # ensure start <= end
+        if v < self.selected_start:
+            self.selected_start = v
+            self.tb_start.set_val(str(self.selected_start))
+        self.selected_end = v
+        self.tb_end.set_val(str(self.selected_end))
 
     # ---------- Controls ----------
     def toggle_play(self):
@@ -290,6 +344,17 @@ class Pose3DPlayer:
 
         self.fig.canvas.draw_idle()
 
+        
+    #--------- Frame Selection Dependencies-----------
+    # NEW: dump them on demand; no other side effects
+    def _on_mark_range(self, _evt):
+        filecleanupsingle(JSON_PATH,'test.json',self.target_idx,(self.selected_start,self.selected_end))
+        print(f"[FrameRange] start={self.selected_start}, end={self.selected_end}")
+
+    # Optional convenience getter if you want to read them from code
+    def get_frame_range(self):
+        return self.selected_start, self.selected_end
+    
     # ---------- Run ----------
     def run(self):
         self._draw_frame(self.i)
@@ -299,9 +364,9 @@ if __name__ == "__main__":
     # Example usage:
     # - Set json_path to your AlphaPose 3D output that contains 'pred_xyz_jts'
     # - Optionally set target_idx to a specific track id after running your repair step
-    json_path = "/Users/franciscojimenez/Desktop/repaired.json"
+    
     viewer = Pose3DPlayer(
-        json_path=json_path,
+        json_path=JSON_PATH,
         target_idx=1,        # or an integer track id, e.g., 0 or 1
         edges=SMPL24_EDGES,
         fps=30,
