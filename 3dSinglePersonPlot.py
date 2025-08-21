@@ -9,7 +9,8 @@ from JSON_FILES.JSONREAD import filecleanup, filecleanupsingle
 
 #CONSTS ---------
 lim = (-1.5,1.5)
-JSON_PATH = "C:/Users/Francisco Jimenez/Desktop/repaired.json"
+JSON_PATH = "C:/Users/Francisco Jimenez/Desktop/rec1RE.json"
+#repaird on desktop^
 # lim = None
 #----------------
 

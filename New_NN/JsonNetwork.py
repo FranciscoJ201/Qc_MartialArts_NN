@@ -2,13 +2,13 @@ import os, json, glob
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-
+import matplotlib.pyplot as plt 
 # ---- Settings ----
 batch_size = 8
 epochs = 25
 learning_rate = 1e-3
 num_classes = 3
-NUM_KPTS = 17        # change if your JSONs have a different count
+NUM_KPTS = 29        # change if your JSONs have a different count
 USE_XY_ONLY = True   # if your JSON has [x,y,score], set True to use XY only
 
 # ---- Utilities: extract & normalize keypoints ----
@@ -185,3 +185,23 @@ with torch.no_grad():
     pred = model(sample.unsqueeze(0))
     pred_label = label_map[pred.argmax(1).item()]
 print(f"\nPredicted: {pred_label}, Actual: {label_map[label]}")
+
+# --- Plot Loss and Accuracy ---
+plt.figure(figsize=(10, 4))
+
+plt.subplot(1, 2, 1)
+plt.plot(train_losses, label="Train Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Training Loss")
+plt.grid(True)
+
+plt.subplot(1, 2, 2)
+plt.plot(test_accuracies, label="Test Accuracy", color='green')
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy (%)")
+plt.title("Test Accuracy")
+plt.grid(True)
+
+plt.tight_layout()
+plt.show()
